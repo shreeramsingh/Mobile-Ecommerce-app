@@ -33,6 +33,25 @@ local.properties
 .cxx/
 *.keystore
 !debug.keystore
+# Release signing secrets — never commit (back them up securely instead)
+android/app/bandookwale-upload.keystore
+android/keystore.properties
+
+# Android build outputs (Android Studio "Generate Signed Bundle/APK", release builds)
+android/app/release/
+android/app/debug/
+*.apk
+*.aab
+*.apks
+
+# Firebase backend service-account keys (the backend's, never the app's)
+*service-account*.json
+*firebase-adminsdk*.json
+
+# Environment / local secrets
+.env
+.env.*
+!.env.example
 .kotlin/
 
 # node.js

@@ -6,7 +6,46 @@ apply plugin: "com.facebook.react"
  * This is the configuration block to customize your React Native Android app.
  * By default you don't need to apply any configuration, just uncomment the lines you need.
  */
+// Release signing credentials (MYAPP_UPLOAD_*): read from android/keystore.properties
+// (git-ignored, never commit it), or from Gradle properties for CI
+// (-P flags / ORG_GRADLE_PROJECT_MYAPP_UPLOAD_* environment variables).
+def uploadSigning = [:]
+def keystorePropsFile = rootProject.file("keystore.properties")
+if (keystorePropsFile.exists()) {
+    def props = new Properties()
+    keystorePropsFile.withInputStream { props.load(it) }
+    props.each { k, v -> uploadSigning[k] = v }
+}
+["MYAPP_UPLOAD_STORE_FILE", "MYAPP_UPLOAD_KEY_ALIAS", "MYAPP_UPLOAD_STORE_PASSWORD", "MYAPP_UPLOAD_KEY_PASSWORD"].each { key ->
+    if (!uploadSigning[key] && project.hasProperty(key)) uploadSigning[key] = project.property(key)
+}
+
+// Some libraries (react-native-keychain, react-native-screens) look this up on the app
+// project; when set they don't need to run `node` to find React Native.
+ext.REACT_NATIVE_NODE_MODULES_DIR = file("$rootDir/../node_modules/react-native").absolutePath
+
+// Full path to `node` for React Native's Gradle tasks (codegen, bundling).
+// Gradle daemons started by Android Studio / editors often don't have Homebrew or
+// nvm on their PATH, which fails with "A problem occurred starting process 'command 'node''".
+// Override with the NODE_BINARY environment variable if node lives elsewhere.
+def resolveNodeBinary() {
+    def fromEnv = System.getenv("NODE_BINARY")
+    if (fromEnv && new File(fromEnv).canExecute()) return fromEnv
+    def candidates = [
+        "/opt/homebrew/bin/node",   // Homebrew on Apple Silicon
+        "/usr/local/bin/node",      // Homebrew on Intel / official installer
+        "${System.getProperty('user.home')}/.volta/bin/node",
+    ]
+    def nvmDir = new File("${System.getProperty('user.home')}/.nvm/versions/node")
+    if (nvmDir.isDirectory()) {
+        nvmDir.listFiles()?.sort { it.name }?.reverse()?.each { candidates << "${it}/bin/node" }
+    }
+    return candidates.find { new File(it).canExecute() } ?: "node"
+}
+
 react {
+    nodeExecutableAndArgs = [resolveNodeBinary()]
+
     /* Folders */
     //   The root of your project, i.e. where "package.json" lives. Default is '../..'
     // root = file("../../")
@@ -92,15 +131,25 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        release {
+            // Play Store upload key: android/app/bandookwale-upload.keystore (git-ignored),
+            // with the MYAPP_UPLOAD_* values from android/gradle.properties.
+            if (uploadSigning.MYAPP_UPLOAD_STORE_FILE) {
+                storeFile file(uploadSigning.MYAPP_UPLOAD_STORE_FILE)
+                storePassword uploadSigning.MYAPP_UPLOAD_STORE_PASSWORD
+                keyAlias uploadSigning.MYAPP_UPLOAD_KEY_ALIAS
+                keyPassword uploadSigning.MYAPP_UPLOAD_KEY_PASSWORD
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            // Signed with the upload key when it's available; otherwise falls back to the
+            // debug key so release builds still work on machines without the key (not uploadable).
+            signingConfig uploadSigning.MYAPP_UPLOAD_STORE_FILE ? signingConfigs.release : signingConfigs.debug
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
         }
@@ -110,10 +159,20 @@ android {
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
+    // Native splash screen (works on Android 6+ and uses the system splash on Android 12+)
+    implementation("androidx.core:core-splashscreen:1.0.1")
 
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")
     } else {
         implementation jscFlavor
     }
+}
+
+// Push notifications: Firebase reads android/app/google-services.json (from the Firebase
+// console). Until that file is added the app builds and runs normally, with push turned off.
+if (file("google-services.json").exists()) {
+    apply plugin: "com.google.gms.google-services"
+} else {
+    logger.warn("google-services.json not found in android/app — push notifications are disabled in this build.")
 }

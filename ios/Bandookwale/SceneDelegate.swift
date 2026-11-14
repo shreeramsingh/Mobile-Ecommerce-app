@@ -19,6 +19,8 @@ class SceneDelegate: RCTDefaultReactNativeFactoryDelegate, UIWindowSceneDelegate
     dependencyProvider = RCTAppDependencyProvider()
     reactNativeFactory = RCTReactNativeFactory(delegate: self)
     window = UIWindow(windowScene: windowScene)
+    // Black behind the app (matches the launch screen) so there's no white flash.
+    window?.backgroundColor = .black
     
     #if DEBUG
     let devMenuConfiguration = RCTDevMenuConfiguration(
@@ -44,6 +46,12 @@ class SceneDelegate: RCTDefaultReactNativeFactoryDelegate, UIWindowSceneDelegate
 
   func scene(_ scene: UIScene, continue userActivity: NSUserActivity) {
     RCTLinkingManager.scene(scene, continue: userActivity)
+  }
+
+  // Black root view while JavaScript loads, so the launch screen hands off without a white flash.
+  override func customize(_ rootView: RCTRootView) {
+    super.customize(rootView)
+    rootView.backgroundColor = .black
   }
 
   override func bundleURL() -> URL? {

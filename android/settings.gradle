@@ -1,6 +1,26 @@
 pluginManagement { includeBuild("../node_modules/@react-native/gradle-plugin") }
 plugins { id("com.facebook.react.settings") }
-extensions.configure(com.facebook.react.ReactSettingsExtension){ ex -> ex.autolinkLibrariesFromCommand() }
+
+// Run the React Native CLI with a full path to `node` instead of `npx`, so autolinking
+// also works in Gradle daemons started by Android Studio / editors whose PATH doesn't
+// include Homebrew or nvm. Override with the NODE_BINARY environment variable.
+def resolveNodeBinary() {
+    def fromEnv = System.getenv("NODE_BINARY")
+    if (fromEnv && new File(fromEnv).canExecute()) return fromEnv
+    def home = System.getProperty('user.home')
+    def candidates = ["/opt/homebrew/bin/node", "/usr/local/bin/node", "${home}/.volta/bin/node"]
+    def nvmDir = new File("${home}/.nvm/versions/node")
+    if (nvmDir.isDirectory()) {
+        nvmDir.listFiles()?.sort { it.name }?.reverse()?.each { candidates << "${it}/bin/node" }
+    }
+    return candidates.find { new File(it).canExecute() } ?: "node"
+}
+
+extensions.configure(com.facebook.react.ReactSettingsExtension) { ex ->
+    ex.autolinkLibrariesFromCommand(
+        [resolveNodeBinary(), "node_modules/@react-native-community/cli/build/bin.js", "config"]
+    )
+}
 rootProject.name = 'Bandookwale'
 include ':app'
 includeBuild('../node_modules/@react-native/gradle-plugin')

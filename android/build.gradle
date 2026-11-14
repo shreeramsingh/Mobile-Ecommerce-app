@@ -6,6 +6,10 @@ buildscript {
         targetSdkVersion = 36
         ndkVersion = "27.1.12297006"
         kotlinVersion = "2.2.0"
+        // Tell libraries like react-native-svg where React Native lives, so they don't
+        // shell out to `node` (which fails in Gradle daemons started by Android Studio,
+        // whose PATH doesn't include Homebrew's node).
+        REACT_NATIVE_NODE_MODULES_DIR = file("$rootDir/../node_modules/react-native").absolutePath
     }
     repositories {
         google()
@@ -15,6 +19,8 @@ buildscript {
         classpath("com.android.tools.build:gradle")
         classpath("com.facebook.react:react-native-gradle-plugin")
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin")
+        // Firebase (push notifications): reads android/app/google-services.json
+        classpath("com.google.gms:google-services:4.6.0")
     }
 }
 

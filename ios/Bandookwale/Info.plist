@@ -34,8 +34,33 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string></string>
+	<key>NSCameraUsageDescription</key>
+	<string>Bandookwale uses the camera to take photos of items you sell and of payment receipts.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Bandookwale needs access to your photos to add pictures of items you sell and payment receipts.</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.bandookwale</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>bandookwale</string>
+			</array>
+		</dict>
+	</array>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>upi</string>
+		<string>whatsapp</string>
+		<string>tez</string>
+		<string>phonepe</string>
+		<string>paytmmp</string>
+	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 	<key>RCTNewArchEnabled</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

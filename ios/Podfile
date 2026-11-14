@@ -8,11 +8,11 @@ require Pod::Executable.execute_command('node', ['-p',
 platform :ios, min_ios_version_supported
 prepare_react_native_project!
 
-linkage = ENV['USE_FRAMEWORKS']
-if linkage != nil
-  Pod::UI.puts "Configuring Pod with #{linkage}ally linked Frameworks".green
-  use_frameworks! :linkage => linkage.to_sym
-end
+# Firebase (push notifications) resolves the Firebase SDK through Swift Package Manager,
+# which needs pods built as dynamic frameworks (static linkage causes duplicate symbols).
+linkage = ENV['USE_FRAMEWORKS'] || 'dynamic'
+Pod::UI.puts "Configuring Pod with #{linkage}ally linked Frameworks".green
+use_frameworks! :linkage => linkage.to_sym
 
 target 'Bandookwale' do
   config = use_native_modules!
@@ -30,5 +30,31 @@ target 'Bandookwale' do
       :mac_catalyst_enabled => false,
       # :ccache_enabled => true
     )
+
+    # Some library resource bundles (e.g. image picker's privacy bundle) default to
+    # iOS 9, which current Xcode rejects. Lift every pod to the app's minimum.
+    # Dynamic frameworks must link every system framework they use; some libraries
+    # rely on static linking pulling these in for them.
+    # (System frameworks are shared by iOS, so linking unused ones costs nothing.)
+    system_frameworks = %w[
+      MobileCoreServices UniformTypeIdentifiers Photos PhotosUI AVFoundation ImageIO
+      Security LocalAuthentication UserNotifications
+    ]
+    installer.pods_project.targets.each do |target|
+      next if target.name.start_with?('Pods-') # the app's aggregate target links everything already
+      target.build_configurations.each do |bc|
+        flags = Array(bc.build_settings['OTHER_LDFLAGS'] || '$(inherited)')
+        system_frameworks.each { |f| flags += ['-weak_framework', f] }
+        bc.build_settings['OTHER_LDFLAGS'] = flags
+      end
+    end
+
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |bc|
+        if bc.build_settings['IPHONEOS_DEPLOYMENT_TARGET'].to_f < min_ios_version_supported.to_f
+          bc.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = min_ios_version_supported
+        end
+      end
+    end
   end
 end

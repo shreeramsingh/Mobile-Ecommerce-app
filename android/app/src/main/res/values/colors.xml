@@ -1,0 +1,5 @@
+<resources>
+    <color name="splash_background">#000000</color>
+    <!-- Accent tint for push notification icons (brand yellow) -->
+    <color name="notification_color">#F5B301</color>
+</resources>
