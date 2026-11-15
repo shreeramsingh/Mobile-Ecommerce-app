@@ -16,8 +16,18 @@ import { ProductImage } from '../../components/ProductImage';
 import { AppText, Loader } from '../../components/ui';
 import { colors, font, radius } from '../../theme';
 
+// A message confirmed by the server (exact match, server timestamps).
 const sameMessage = (a: ChatMessage, b: ChatMessage) =>
   a.senderId === b.senderId && a.content === b.content && a.timestamp === b.timestamp;
+
+// The server replaces the timestamp of every message it receives, so a message we
+// showed optimistically can't be matched by time. Match it by sender + text instead,
+// allowing for clock differences between the phone and the server.
+const MATCH_WINDOW_MS = 5 * 60 * 1000;
+const isEchoOf = (local: ChatMessage, server: ChatMessage) =>
+  local.senderId === server.senderId &&
+  local.content === server.content &&
+  Math.abs(new Date(server.timestamp).getTime() - new Date(local.timestamp).getTime()) < MATCH_WINDOW_MS;
 
 export function ChatScreen({ route, navigation }: RootScreenProps<'Chat'>) {
   const insets = useSafeAreaInsets();
@@ -59,8 +69,20 @@ export function ChatScreen({ route, navigation }: RootScreenProps<'Chat'>) {
   useEffect(() => {
     if (!historyQ.data) return;
     setMessages((prev) => {
-      const local = prev.filter((m) => (m.pending || m.queued) && !historyQ.data!.some((h) => sameMessage(h, m)));
-      return [...historyQ.data!, ...local];
+      // Keep optimistic messages the history doesn't contain yet. Each history message can
+      // stand in for only one local copy, so sending "Hi" twice still shows two.
+      const history = historyQ.data!;
+      const used = new Set<number>();
+      const local = prev.filter((m) => {
+        if (!(m.pending || m.queued)) return false;
+        const i = history.findIndex((h, idx) => !used.has(idx) && isEchoOf(m, h));
+        if (i >= 0) {
+          used.add(i);
+          return false;
+        }
+        return true;
+      });
+      return [...history, ...local];
     });
   }, [historyQ.data]);
 
@@ -70,7 +92,9 @@ export function ChatScreen({ route, navigation }: RootScreenProps<'Chat'>) {
     const release = chatSocket.retain();
     const unsub = chatSocket.subscribe(conversationId, (msg) => {
       setMessages((prev) => {
-        const i = prev.findIndex((m) => (m.pending || m.queued) && sameMessage(m, msg));
+        // Our own message coming back from the server replaces its optimistic copy
+        // (oldest pending first), instead of being shown a second time.
+        const i = prev.findIndex((m) => (m.pending || m.queued) && isEchoOf(m, msg));
         if (i >= 0) {
           const next = [...prev];
           next[i] = msg;
